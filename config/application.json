@@ -1,0 +1,27 @@
+{
+  "title": "Manhattan WiFi Accessibility",
+  "appid": "",
+  "group": "",
+  "webmap": "",
+  "webscene": "5ab08e64bbe44c6cbed43eff382f1452",
+  "portalUrl": "https://www.arcgis.com",
+  "oauthappid": "kCCF9lHD2DdhhbUB",
+  "proxyUrl": "https://apl.esri.com/proxy/DotNet/proxy.ashx",
+  "units": "dual",
+  "helperServices": {
+    "geometry": {
+      "url": null
+    },
+    "printTask": {
+      "url": null
+    },
+    "elevationSync": {
+      "url": null
+    },
+    "geocode": [
+      {
+        "url": null
+      }
+    ]
+  }
+}

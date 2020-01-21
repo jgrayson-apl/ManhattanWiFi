@@ -1,0 +1,114 @@
+html,
+body {
+  margin                   : 0;
+  padding                  : 0;
+  width                    : 100%;
+  height                   : 100%;
+  font-size                : 100%;
+  -webkit-text-size-adjust : 100%;
+  -moz-text-size-adjust    : 100%;
+  -ms-text-size-adjust     : 100%;
+}
+
+body {
+  display          : flex;
+  flex-direction   : column;
+  background-color : #595959;
+}
+
+body * {
+  outline : none;
+}
+
+#header-panel {
+  flex-shrink      : 0;
+  flex-grow        : 0;
+  min-width        : 0;
+  min-height       : 0;
+  z-index          : 99;
+  box-shadow       : 0 1px 2px rgba(0, 0, 0, 0.3);
+  background-color : #eadb69;
+}
+
+#main-container {
+  flex-shrink    : 1;
+  flex-grow      : 1;
+  min-width      : 0;
+  min-height     : 0;
+  display        : flex;
+  flex-direction : row;
+}
+
+#view-container {
+  flex-shrink : 1;
+  flex-grow   : 1;
+  min-width   : 0;
+  min-height  : 0;
+}
+
+#left-container {
+  flex-shrink    : 1;
+  flex-grow      : 1;
+  min-width      : 0;
+  min-height     : 0;
+  display        : flex;
+  flex-direction : column;
+}
+
+#wifi-free-container,
+#wifi-fee-container {
+  flex           : 1 1 0;
+  min-width      : 0;
+  min-height     : 0;
+  display        : flex;
+  flex-direction : column;
+}
+
+#wifi-free-list,
+#wifi-fee-list {
+  flex           : 1 1 0;
+  min-width      : 0;
+  min-height     : 0;
+  display        : flex;
+  flex-direction : column;
+  overflow-y     : auto;
+}
+
+#options-panel {
+  flex-grow      : 0;
+  flex-shrink    : 0;
+  min-width      : 0;
+  min-height     : 0;
+  display        : flex;
+  flex-direction : column;
+}
+
+#user-thumb-node {
+  height         : 36px;
+  border-radius  : 18px;
+  vertical-align : middle;
+}
+
+.top-nav-link:hover, .top-nav-link:focus {
+  color               : #222222;
+  border-bottom-color : #222222;
+}
+
+.esri-widget--button {
+  background-color : #eadb69 !important;
+}
+
+.esri-attribution {
+  color            : #323232 !important;
+  background-color : rgba(234, 219, 105, 0.5) !important;
+}
+
+.esri-attribution:hover {
+  color            : #222222 !important;
+  background-color : rgba(234, 219, 105, 0.9) !important;
+}
+
+.side-nav-link:last-of-type {
+  border-bottom : solid 1px #efefef;
+}
+
