@@ -472,8 +472,8 @@ define([
       const distanceSlider = new Slider({
         container: "search-distance-slider",
         min: 1,
-        max: 600,
-        values: [400],
+        max: 1000,
+        values: [600],
         steps: 1,
         snapOnClickEnabled: true,
         labelsVisible: true,
