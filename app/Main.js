@@ -48,6 +48,7 @@ define([
   "esri/tasks/support/RouteParameters",
   "esri/tasks/support/FeatureSet",
   "esri/widgets/LineOfSight/LineOfSightViewModel",
+  "esri/widgets/Legend",
   "esri/widgets/Slider",
   "esri/widgets/Expand"
 ], function(calcite, declare, ApplicationBase, i18n, itemUtils, domHelper,
@@ -55,7 +56,7 @@ define([
             IdentityManager, Evented, watchUtils, promiseUtils, Portal,
             Layer, GraphicsLayer, Point, Extent, geometryEngine, geodesicUtils,
             Graphic, symbolUtils, Home, RouteTask, RouteParameters, FeatureSet,
-            LineOfSightViewModel, Slider, Expand){
+            LineOfSightViewModel, Legend, Slider, Expand){
 
   return declare([Evented], {
 
@@ -301,7 +302,7 @@ define([
             profile: "quad",
             profileRotation: "heading",
             castShadows: true,
-            width: 10, height: 2,
+            width: 10, height: 0.5,
             material: { color: "#eadb69" }
           }]
         }
@@ -338,13 +339,9 @@ define([
         const routeResult = data.routeResults[0].route;
         routeFeature.geometry = routeResult.geometry;
 
-        view.goTo({ target: routeFeature.geometry, scale: 7500, tilt: 35.0 }).then(() => {
+        view.goTo({ target: routeFeature.geometry, scale: 7500, tilt: 45.0 }).then(() => {
           this.emit("route-solved", routeResult);
         });
-
-        // setTimeout(() => {
-        //   this.emit("route-solved", routeResult);
-        // }, 1000);
 
       };
 
@@ -366,13 +363,13 @@ define([
       const displayWiFiDetails = (wifiFeature) => {
 
         const wifiNode = domConstruct.create("div", { className: "wifi-node side-nav-link" }, wifiList);
-        const wifiSymbolNode = domConstruct.create("span", { className: "wifi-symbol margin-right-half left" }, wifiNode);
+        //const wifiSymbolNode = domConstruct.create("span", { className: "wifi-symbol margin-right-half left" }, wifiNode);
         domConstruct.create("div", { className: "font-size-0", innerHTML: wifiFeature.attributes.NAME }, wifiNode);
         domConstruct.create("div", { className: "font-size--3 avenir-italic text-right", innerHTML: wifiFeature.attributes.ADDRESS }, wifiNode);
 
-        symbolUtils.getDisplayedSymbol(wifiFeature, {}).then(symbol => {
+        /*symbolUtils.getDisplayedSymbol(wifiFeature, {}).then(symbol => {
           symbolUtils.renderPreviewHTML(symbol, { node: wifiSymbolNode });
-        });
+        });*/
 
         return wifiNode;
       };
@@ -385,15 +382,19 @@ define([
         wifiLayer.outFields = ["*"];
 
         wifiLayer.renderer.uniqueValueInfos.forEach(uvInfo => {
-          uvInfo.symbol.symbolLayers.unshift({
+          uvInfo.symbol.symbolLayers.unshift({  // unshift vs push
             type: "icon",
-            size: 34,
+            size: 18,
             anchor: "relative",
-            anchorPosition: { x: 0, y: 0.4 },
+            anchorPosition: { x: 0, y: 0.35 },
             resource: { primitive: "circle" },
             material: { color: Color.named.white }
           });
         });
+
+        // const legend = new Legend({view:view,layerInfos:[{layer:wifiLayer}]});
+        // view.ui.add(legend,"top-right");
+
 
         return view.whenLayerView(wifiLayer).then(wifiLayerView => {
           return watchUtils.whenNotOnce(wifiLayerView, "updating", () => {
@@ -405,6 +406,11 @@ define([
             //
             const losViewModel = new LineOfSightViewModel({ view: view });
             let losObserverWGS84 = null;
+
+            this.losClear = () => {
+              losViewModel.clear();
+            };
+
             losViewModel.targets.on("change", changeEvt => {
 
               let visibleIdx = [];
@@ -458,7 +464,7 @@ define([
 
                   infos.features.push(wifiFeature);
                   infos.nodes.push(displayWiFiDetails(wifiFeature));
-                  infos.targets.push({ location: this.setPointZOffset(wifiFeature.geometry, 3.0) });
+                  infos.targets.push({ location: this.setPointZOffset(wifiFeature.geometry, 6.0) });
 
                   return infos;
                 }, { features: [], targets: [], nodes: [], selected: [] });
@@ -467,15 +473,6 @@ define([
                 losViewModel.start();
               });
             };
-
-
-            /* this.doLOSAnalysis = (observer, targets) => {
-               losViewModel.observer = observer;
-               losViewModel.targets = targets;
-               losViewModel.start();
-               losViewModel.stop();
-             };*/
-
 
             let highlight = null;
             this.on("route-cleared", () => {
@@ -487,7 +484,7 @@ define([
               highlight && highlight.remove();
             });
 
-            this.doAnalysis = (location, searchArea) => {
+            this.updateLOSAnalysis = (location, searchArea) => {
               losViewModel.observer = location;
               losViewModel.stop();
 
@@ -539,36 +536,49 @@ define([
       view.map.add(locationsLayer);
 
 
-      // wifi range = 100 to 300 meters //
-      this.analysisSearchDistanceMeters = 300;
-      const realTime = 60;
-      const simulation = 15;  // 4X realtime
-      const playbackRate = 1000;
+      this.analysisSearchDistanceMeters = 100;
+
+      const playbackRate_realTime = 1.0;
+      const playbackRate_simulation = 4.0;
 
       let alongLocation = null;
       const updateAnalysis = () => {
         if(alongLocation){
           distanceFeature.geometry = geometryEngine.geodesicBuffer(alongLocation, this.analysisSearchDistanceMeters, "meters");
           locationFeature.geometry = this.setPointZOffset(alongLocation, 3.0);
-          this.doAnalysis(locationFeature.geometry, distanceFeature.geometry);
+          this.updateLOSAnalysis(locationFeature.geometry, distanceFeature.geometry);
         }
       };
 
       let _animating = false;
       let _routePolyline = null;
       let _totalTimeMinutes = null;
-      let _start = null;
-      let _progress = null;
+      let _alongTimeMinutes = null;
 
-      const _updateAlongLocation = (ts) => {
-        if(!_start) _start = ts;
-        _progress = (ts - _start);
+      const _updateAlongLocation = () => {
+        if(!_alongTimeMinutes) _alongTimeMinutes = 0.0;
 
-        const alongTimeMinutes = (_progress / (playbackRate * simulation));
-        if(_animating && (alongTimeMinutes <= _totalTimeMinutes)){
-          alongLocation = this.findLocationAlong(_routePolyline, alongTimeMinutes);
-          updateAnalysis();
-          requestAnimationFrame(_updateAlongLocation);
+        if(_alongTimeMinutes <= _totalTimeMinutes){
+          if(_animating){
+
+            alongLocation = this.findLocationAlong(_routePolyline, _alongTimeMinutes);
+            updateAnalysis();
+
+            _alongTimeMinutes += (60 / (1000 * playbackRate_simulation));
+
+            requestAnimationFrame(_updateAlongLocation);
+
+          } else {
+            stopAnimation();
+          }
+        } else {
+          stopAnimation();
+          domClass.add(animateBtn, "btn-disabled");
+          this.losClear();
+          _alongTimeMinutes = 0.0;
+          alongLocation = null;
+          distanceFeature.geometry = null;
+          locationFeature.geometry = null;
         }
       };
 
@@ -604,14 +614,14 @@ define([
 
         _routePolyline = routeResult.geometry.clone();
         _totalTimeMinutes = routeResult.attributes.Total_TravelTime;
-        _start = null;
+        _alongTimeMinutes = 0.0;
 
         const searchArea = geometryEngine.geodesicBuffer(_routePolyline, this.analysisSearchDistanceMeters, "meters");
         this.losSetTargets(searchArea).then(() => {
 
           setTimeout(() => {
             startAnimation();
-          }, 1000);
+          }, 1500);
 
         });
 

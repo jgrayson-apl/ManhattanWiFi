@@ -72,6 +72,18 @@ body * {
   overflow-y     : auto;
 }
 
+#wifi-list:empty {
+  font-style : italic;
+  text-align : center;
+  padding    : 1.5em;
+  font-size  : 1.5em;
+  color      : silver;
+}
+
+#wifi-list:empty:before {
+  content : "Click on the map to set the route start and end locations...";
+}
+
 .wifi-node {
   border-left : solid 6px #f8f8f8;
 }
@@ -83,7 +95,7 @@ body * {
 }
 
 .wifi-symbol {
-  box-shadow : 0 1px 2px rgba(0, 0, 0, 0.3);
+  /*box-shadow : 0 1px 2px rgba(0, 0, 0, 0.3);*/
 }
 
 #options-panel {
@@ -108,6 +120,10 @@ body * {
 
 .esri-widget--button {
   background-color : #eadb69 !important;
+}
+
+.esri-legend {
+  width : unset !important;
 }
 
 .esri-attribution {
