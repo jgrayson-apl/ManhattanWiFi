@@ -89,25 +89,18 @@
       <!-- LEFT CONTAINER -->
       <div id="left-container" class="panel panel-dark text-off-black panel-no-border column-6">
 
-        <div id="animate-panel" class="panel panel-white trailer-half hide">
+        <div id="animate-panel" class="panel panel-white trailer-half">
           <div id="animate-btn" class="font-size-7 icon-ui-play text-center btn-disabled"></div>
         </div>
-
-        <div id="options-panel" class="panel panel-white trailer-half">
-          <label class="trailer-half">
-            <div class="trailer-half">Search Distance (ft)</div>
-            <div id="search-distance-slider"></div>
-          </label>
-          <!--<div class="leader-quarter text-center">
-            <button class="btn-link icon-ui-play"></button>
-            <button class="btn-link icon-ui-close"></button>
-          </div>-->
-        </div>
-
+              
         <aside id="wifi-container" class="side-nav trailer-half" aria-role="complementary">
           <div class="side-nav-title">
             <span>WiFi Locations</span>
-            <mark id="wifi-count" class="label label-yellow avenir-demi right">0 or 0</mark>
+            <mark class="label label-yellow avenir-demi right">
+              <span id="wifi-selected-count">0</span>
+              <span>of</span>
+              <span id="wifi-count">0</span>
+            </mark>
           </div>
           <nav id="wifi-list" role="navigation" aria-labelledby="sidenav"></nav>
         </aside>

@@ -40,7 +40,9 @@ define([
   "esri/geometry/Point",
   "esri/geometry/Extent",
   "esri/geometry/geometryEngine",
+  "esri/geometry/support/geodesicUtils",
   "esri/Graphic",
+  "esri/symbols/support/symbolUtils",
   "esri/widgets/Home",
   "esri/tasks/RouteTask",
   "esri/tasks/support/RouteParameters",
@@ -51,8 +53,8 @@ define([
 ], function(calcite, declare, ApplicationBase, i18n, itemUtils, domHelper,
             Color, colors, number, locale, on, query, dom, domClass, domConstruct,
             IdentityManager, Evented, watchUtils, promiseUtils, Portal,
-            Layer, GraphicsLayer, Point, Extent, geometryEngine,
-            Graphic, Home, RouteTask, RouteParameters, FeatureSet,
+            Layer, GraphicsLayer, Point, Extent, geometryEngine, geodesicUtils,
+            Graphic, symbolUtils, Home, RouteTask, RouteParameters, FeatureSet,
             LineOfSightViewModel, Slider, Expand){
 
   return declare([Evented], {
@@ -359,12 +361,18 @@ define([
 
       const wifiList = dom.byId("wifi-list");
       const wifiCountNode = dom.byId("wifi-count");
+      const wifiSelectedCountNode = dom.byId("wifi-selected-count");
 
       const displayWiFiDetails = (wifiFeature) => {
 
         const wifiNode = domConstruct.create("div", { className: "wifi-node side-nav-link" }, wifiList);
+        const wifiSymbolNode = domConstruct.create("span", { className: "wifi-symbol margin-right-half left" }, wifiNode);
         domConstruct.create("div", { className: "font-size-0", innerHTML: wifiFeature.attributes.NAME }, wifiNode);
         domConstruct.create("div", { className: "font-size--3 avenir-italic text-right", innerHTML: wifiFeature.attributes.ADDRESS }, wifiNode);
+
+        symbolUtils.getDisplayedSymbol(wifiFeature, {}).then(symbol => {
+          symbolUtils.renderPreviewHTML(symbol, { node: wifiSymbolNode });
+        });
 
         return wifiNode;
       };
@@ -396,30 +404,40 @@ define([
             // LINE-OF-SIGHT //
             //
             const losViewModel = new LineOfSightViewModel({ view: view });
+            let losObserverWGS84 = null;
             losViewModel.targets.on("change", changeEvt => {
 
               let visibleIdx = [];
               changeEvt.added.forEach((target, targetIdx) => {
                 target.watch("visible", visible => {
 
-                  if(visible && !visibleIdx.includes(targetIdx)){
+                  if(losObserverWGS84 != null){
+                    if(visible && !visibleIdx.includes(targetIdx)){
 
-                    //
-                    // TODO: CHECK DISTANCE BEFORE ADDING TO VISIBLE ???????
-                    //
+                      const losTargetWGS84 = new Point({
+                        spatialReference: { wkid: 4326 },
+                        longitude: target.location.longitude,
+                        latitude: target.location.latitude,
+                      });
+                      const distanceInfo = geodesicUtils.geodesicDistance(losObserverWGS84, losTargetWGS84);
+                      if(distanceInfo.distance < this.analysisSearchDistanceMeters){
 
-                    visibleIdx.push(targetIdx);
+                        visibleIdx.push(targetIdx);
 
-                    const wifiNode = wifiLocationTargetInfos.nodes[targetIdx];
-                    domClass.add(wifiNode, "visible");
+                        const wifiNode = wifiLocationTargetInfos.nodes[targetIdx];
+                        domClass.add(wifiNode, "visible");
 
-                    const wifiFeature = wifiLocationTargetInfos.features[targetIdx];
-                    wifiLocationTargetInfos.selected.push(wifiFeature);
+                        const wifiFeature = wifiLocationTargetInfos.features[targetIdx];
+                        wifiLocationTargetInfos.selected.push(wifiFeature);
 
-                    highlight && highlight.remove();
-                    highlight = wifiLayerView.highlight(wifiLocationTargetInfos.selected);
+                        wifiSelectedCountNode.innerHTML = wifiLocationTargetInfos.selected.length;
+
+                        highlight && highlight.remove();
+                        highlight = wifiLayerView.highlight(wifiLocationTargetInfos.selected);
+                      }
+
+                    }
                   }
-                  //console.info(targetIdx, visible);
                 })
               });
             });
@@ -433,13 +451,14 @@ define([
               return wifiLayerView.queryFeatures(wifiQuery).then(wifiFS => {
 
                 wifiList.innerHTML = "";
-                wifiCountNode.innerHTML = `0 of ${wifiFS.features.length}`;
+                wifiSelectedCountNode.innerHTML = "0";
+                wifiCountNode.innerHTML = wifiFS.features.length;
 
                 wifiLocationTargetInfos = wifiFS.features.reduce((infos, wifiFeature) => {
 
                   infos.features.push(wifiFeature);
                   infos.nodes.push(displayWiFiDetails(wifiFeature));
-                  infos.targets.push({ location: this.setPointZOffset(wifiFeature.geometry, 0.0) });
+                  infos.targets.push({ location: this.setPointZOffset(wifiFeature.geometry, 3.0) });
 
                   return infos;
                 }, { features: [], targets: [], nodes: [], selected: [] });
@@ -463,6 +482,7 @@ define([
               wifiLayerView.filter = null;
               losViewModel.clear();
               wifiList.innerHTML = "";
+              wifiSelectedCountNode.innerHTML = "0";
               wifiCountNode.innerHTML = "0";
               highlight && highlight.remove();
             });
@@ -470,6 +490,13 @@ define([
             this.doAnalysis = (location, searchArea) => {
               losViewModel.observer = location;
               losViewModel.stop();
+
+              losObserverWGS84 = new Point({
+                spatialReference: { wkid: 4326 },
+                longitude: location.longitude,
+                latitude: location.latitude,
+              });
+
             };
 
           });
@@ -513,35 +540,21 @@ define([
 
 
       // wifi range = 100 to 300 meters //
-      const distanceSlider = new Slider({
-        container: "search-distance-slider",
-        min: 1,
-        max: 1000,
-        values: [600],
-        steps: 1,
-        snapOnClickEnabled: true,
-        labelsVisible: true,
-        rangeLabelsVisible: true
-      });
-      distanceSlider.watch("values", values => {
-        updateAnalysis();
-      });
-
-
-      const playbackRate = 1000;
-      const simulation = 1;
+      this.analysisSearchDistanceMeters = 300;
       const realTime = 60;
+      const simulation = 15;  // 4X realtime
+      const playbackRate = 1000;
 
       let alongLocation = null;
       const updateAnalysis = () => {
         if(alongLocation){
-          distanceFeature.geometry = geometryEngine.geodesicBuffer(alongLocation, distanceSlider.values[0], "feet");
-          locationFeature.geometry = this.setPointZOffset(alongLocation, 2.0);
+          distanceFeature.geometry = geometryEngine.geodesicBuffer(alongLocation, this.analysisSearchDistanceMeters, "meters");
+          locationFeature.geometry = this.setPointZOffset(alongLocation, 3.0);
           this.doAnalysis(locationFeature.geometry, distanceFeature.geometry);
         }
       };
 
-      let _animating = true;
+      let _animating = false;
       let _routePolyline = null;
       let _totalTimeMinutes = null;
       let _start = null;
@@ -560,26 +573,26 @@ define([
       };
 
       const startAnimation = () => {
-        // domClass.remove(animateBtn, "icon-ui-play");
-        // domClass.add(animateBtn, "icon-ui-pause");
+        domClass.remove(animateBtn, "icon-ui-play");
+        domClass.add(animateBtn, "icon-ui-pause");
         _animating = true;
         requestAnimationFrame(_updateAlongLocation);
       };
 
       const stopAnimation = () => {
-        // domClass.add(animateBtn, "icon-ui-play");
-        // domClass.remove(animateBtn, "icon-ui-pause");
+        domClass.add(animateBtn, "icon-ui-play");
+        domClass.remove(animateBtn, "icon-ui-pause");
         _animating = false;
       };
 
-      /*const animateBtn = dom.byId("animate-btn");
+      const animateBtn = dom.byId("animate-btn");
       on(animateBtn, "click", () => {
         if(_animating){
           stopAnimation();
         } else {
           startAnimation();
         }
-      });*/
+      });
 
       this.on("route-cleared", () => {
         alongLocation = null;
@@ -593,7 +606,7 @@ define([
         _totalTimeMinutes = routeResult.attributes.Total_TravelTime;
         _start = null;
 
-        const searchArea = geometryEngine.geodesicBuffer(_routePolyline, distanceSlider.values[0], "feet");
+        const searchArea = geometryEngine.geodesicBuffer(_routePolyline, this.analysisSearchDistanceMeters, "meters");
         this.losSetTargets(searchArea).then(() => {
 
           setTimeout(() => {
@@ -602,7 +615,7 @@ define([
 
         });
 
-        //domClass.remove(animateBtn, "btn-disabled");
+        domClass.remove(animateBtn, "btn-disabled");
       });
 
     },
