@@ -54,7 +54,7 @@
     <!-- TOP NAVIGATION -->
     <header id="header-panel" class="panel panel-blue panel-no-padding panel-no-border padding-left-1 padding-right-1">
       <!-- APP TITLE -->
-      <span id="app-title-node" class="top-nav-title"></span>
+      <span id="app-title-node" class="top-nav-title avenir-demi"></span>
 
       <!-- RIGHT ALIGNED -->
       <nav class="top-nav-list right" role="navigation">
@@ -89,6 +89,10 @@
       <!-- LEFT CONTAINER -->
       <div id="left-container" class="panel panel-dark text-off-black panel-no-border column-6">
 
+        <div id="animate-panel" class="panel panel-white trailer-half hide">
+          <div id="animate-btn" class="font-size-7 icon-ui-play text-center btn-disabled"></div>
+        </div>
+
         <div id="options-panel" class="panel panel-white trailer-half">
           <label class="trailer-half">
             <div class="trailer-half">Search Distance (ft)</div>
@@ -100,20 +104,12 @@
           </div>-->
         </div>
 
-        <aside id="wifi-free-container" class="side-nav trailer-half" aria-role="complementary">
+        <aside id="wifi-container" class="side-nav trailer-half" aria-role="complementary">
           <div class="side-nav-title">
-            <span>Free</span>
-            <mark id="wifi-free-count" class="label label-yellow avenir-demi right">0</mark>
+            <span>WiFi Locations</span>
+            <mark id="wifi-count" class="label label-yellow avenir-demi right">0 or 0</mark>
           </div>
-          <nav id="wifi-free-list" role="navigation" aria-labelledby="sidenav"></nav>
-        </aside>
-
-        <aside id="wifi-fee-container" class="side-nav" aria-role="complementary">
-          <div class="side-nav-title">
-            <span>Fee-based</span>
-            <mark id="wifi-fee-count" class="label label-yellow avenir-demi right">0</mark>
-          </div>
-          <nav id="wifi-fee-list" role="navigation" aria-labelledby="sidenav"></nav>
+          <nav id="wifi-list" role="navigation" aria-labelledby="sidenav"></nav>
         </aside>
 
       </div>

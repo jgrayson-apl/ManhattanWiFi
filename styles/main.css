@@ -55,8 +55,7 @@ body * {
   flex-direction : column;
 }
 
-#wifi-free-container,
-#wifi-fee-container {
+#wifi-container {
   flex           : 1 1 0;
   min-width      : 0;
   min-height     : 0;
@@ -64,14 +63,23 @@ body * {
   flex-direction : column;
 }
 
-#wifi-free-list,
-#wifi-fee-list {
+#wifi-list {
   flex           : 1 1 0;
   min-width      : 0;
   min-height     : 0;
   display        : flex;
   flex-direction : column;
   overflow-y     : auto;
+}
+
+.wifi-node {
+  border-left : solid 6px #f8f8f8;
+}
+
+.wifi-node.visible {
+  color             : limegreen;
+  background-color  : rgba(50, 205, 50, 0.05);
+  border-left-color : limegreen;
 }
 
 #options-panel {

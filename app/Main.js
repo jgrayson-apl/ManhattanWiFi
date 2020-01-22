@@ -98,6 +98,11 @@ define([
       const viewProperties = itemUtils.getConfigViewProperties(this.base.config);
       viewProperties.container = "view-container";
       viewProperties.constraints = { snapToZoom: false };
+      viewProperties.highlightOptions = {
+        color: Color.named.limegreen,
+        haloOpacity: 0.9,
+        fillOpacity: 0.2
+      };
 
       const portalItem = this.base.results.applicationItem.value;
       const appProxies = (portalItem && portalItem.appProxies) ? portalItem.appProxies : null;
@@ -213,7 +218,7 @@ define([
 
       this.initializeElevationSampler(view);
 
-      this.initializeLOS(view).then(() => {
+      this.initializeWiFiLocations(view).then(() => {
         this.initializeRoute(view);
         this.initializeRouteTour(view);
       });
@@ -331,7 +336,7 @@ define([
         const routeResult = data.routeResults[0].route;
         routeFeature.geometry = routeResult.geometry;
 
-        view.goTo({ target: routeFeature.geometry, scale: 7500, tilt: 55.0 }).then(() => {
+        view.goTo({ target: routeFeature.geometry, scale: 7500, tilt: 35.0 }).then(() => {
           this.emit("route-solved", routeResult);
         });
 
@@ -350,31 +355,18 @@ define([
      *
      * @param view
      */
-    initializeLOS: function(view){
+    initializeWiFiLocations: function(view){
 
-      const freeList = dom.byId("wifi-free-list");
-      const freeCountNode = dom.byId("wifi-free-count");
-      const feeList = dom.byId("wifi-fee-list");
-      const feeCountNode = dom.byId("wifi-fee-count");
+      const wifiList = dom.byId("wifi-list");
+      const wifiCountNode = dom.byId("wifi-count");
 
-      const updateWiFiDetails = wifiFeatures => {
+      const displayWiFiDetails = (wifiFeature) => {
 
-        freeList.innerHTML = "";
-        feeList.innerHTML = "";
-        let freeCount = 0;
-        let feeCount = 0;
+        const wifiNode = domConstruct.create("div", { className: "wifi-node side-nav-link" }, wifiList);
+        domConstruct.create("div", { className: "font-size-0", innerHTML: wifiFeature.attributes.NAME }, wifiNode);
+        domConstruct.create("div", { className: "font-size--3 avenir-italic text-right", innerHTML: wifiFeature.attributes.ADDRESS }, wifiNode);
 
-        wifiFeatures.forEach(wifiFeature => {
-          const isFree = (wifiFeature.attributes.TYPE === "Free");
-          isFree ? freeCount++ : feeCount++;
-
-          const wifiNode = domConstruct.create("div", { className: "side-nav-link" }, (isFree ? freeList : feeList));
-          domConstruct.create("div", { className: "font-size-0", innerHTML: wifiFeature.attributes.NAME }, wifiNode);
-          domConstruct.create("div", { className: "font-size--3 avenir-italic text-right", innerHTML: wifiFeature.attributes.ADDRESS }, wifiNode);
-        });
-
-        freeCountNode.innerHTML = freeCount;
-        feeCountNode.innerHTML = feeCount;
+        return wifiNode;
       };
 
 
@@ -384,48 +376,100 @@ define([
       return wifiLayer.load().then(() => {
         wifiLayer.outFields = ["*"];
 
+        wifiLayer.renderer.uniqueValueInfos.forEach(uvInfo => {
+          uvInfo.symbol.symbolLayers.unshift({
+            type: "icon",
+            size: 34,
+            anchor: "relative",
+            anchorPosition: { x: 0, y: 0.4 },
+            resource: { primitive: "circle" },
+            material: { color: Color.named.white }
+          });
+        });
+
         return view.whenLayerView(wifiLayer).then(wifiLayerView => {
           return watchUtils.whenNotOnce(wifiLayerView, "updating", () => {
 
+            let wifiLocationTargetInfos = { targets: [], features: [] };
 
+            //
+            // LINE-OF-SIGHT //
+            //
             const losViewModel = new LineOfSightViewModel({ view: view });
-            this.doLOSAnalysis = (observer, targets) => {
-              losViewModel.start();
-              losViewModel.observer = observer;
-              losViewModel.targets = targets;
-              losViewModel.stop();
+            losViewModel.targets.on("change", changeEvt => {
+
+              let visibleIdx = [];
+              changeEvt.added.forEach((target, targetIdx) => {
+                target.watch("visible", visible => {
+
+                  if(visible && !visibleIdx.includes(targetIdx)){
+
+                    //
+                    // TODO: CHECK DISTANCE BEFORE ADDING TO VISIBLE ???????
+                    //
+
+                    visibleIdx.push(targetIdx);
+
+                    const wifiNode = wifiLocationTargetInfos.nodes[targetIdx];
+                    domClass.add(wifiNode, "visible");
+
+                    const wifiFeature = wifiLocationTargetInfos.features[targetIdx];
+                    wifiLocationTargetInfos.selected.push(wifiFeature);
+
+                    highlight && highlight.remove();
+                    highlight = wifiLayerView.highlight(wifiLocationTargetInfos.selected);
+                  }
+                  //console.info(targetIdx, visible);
+                })
+              });
+            });
+
+            this.losSetTargets = searchArea => {
+
+              wifiLayerView.filter = { geometry: searchArea };
+
+              const wifiQuery = wifiLayerView.createQuery();
+              wifiQuery.set({ geometry: searchArea });
+              return wifiLayerView.queryFeatures(wifiQuery).then(wifiFS => {
+
+                wifiList.innerHTML = "";
+                wifiCountNode.innerHTML = `0 of ${wifiFS.features.length}`;
+
+                wifiLocationTargetInfos = wifiFS.features.reduce((infos, wifiFeature) => {
+
+                  infos.features.push(wifiFeature);
+                  infos.nodes.push(displayWiFiDetails(wifiFeature));
+                  infos.targets.push({ location: this.setPointZOffset(wifiFeature.geometry, 0.0) });
+
+                  return infos;
+                }, { features: [], targets: [], nodes: [], selected: [] });
+
+                losViewModel.targets = wifiLocationTargetInfos.targets;
+                losViewModel.start();
+              });
             };
+
+
+            /* this.doLOSAnalysis = (observer, targets) => {
+               losViewModel.observer = observer;
+               losViewModel.targets = targets;
+               losViewModel.start();
+               losViewModel.stop();
+             };*/
 
 
             let highlight = null;
             this.on("route-cleared", () => {
-              freeList.innerHTML = "";
-              feeList.innerHTML = "";
-              freeCountNode.innerHTML = "0";
-              feeCountNode.innerHTML = "0";
+              wifiLayerView.filter = null;
+              losViewModel.clear();
+              wifiList.innerHTML = "";
+              wifiCountNode.innerHTML = "0";
               highlight && highlight.remove();
             });
 
             this.doAnalysis = (location, searchArea) => {
-
-              const wifiQuery = wifiLayerView.createQuery();
-              wifiQuery.set({ geometry: searchArea });
-              wifiLayerView.queryFeatures(wifiQuery).then(wifiFS => {
-
-                updateWiFiDetails(wifiFS.features);
-
-                highlight && highlight.remove();
-                highlight = wifiLayerView.highlight(wifiFS.features);
-
-                const targets = wifiFS.features.map(wifiFeature => {
-                  return { location: this.setPointZOffset(wifiFeature.geometry, 0.0) }
-                });
-
-                requestAnimationFrame(() => {
-                  this.doLOSAnalysis(location, targets);
-                });
-
-              });
+              losViewModel.observer = location;
+              losViewModel.stop();
             };
 
           });
@@ -483,8 +527,10 @@ define([
         updateAnalysis();
       });
 
-      const realTimePlaybackRate = (1000 * 60);
-      const simulationPlaybackRate = 1000;
+
+      const playbackRate = 1000;
+      const simulation = 1;
+      const realTime = 60;
 
       let alongLocation = null;
       const updateAnalysis = () => {
@@ -495,6 +541,46 @@ define([
         }
       };
 
+      let _animating = true;
+      let _routePolyline = null;
+      let _totalTimeMinutes = null;
+      let _start = null;
+      let _progress = null;
+
+      const _updateAlongLocation = (ts) => {
+        if(!_start) _start = ts;
+        _progress = (ts - _start);
+
+        const alongTimeMinutes = (_progress / (playbackRate * simulation));
+        if(_animating && (alongTimeMinutes <= _totalTimeMinutes)){
+          alongLocation = this.findLocationAlong(_routePolyline, alongTimeMinutes);
+          updateAnalysis();
+          requestAnimationFrame(_updateAlongLocation);
+        }
+      };
+
+      const startAnimation = () => {
+        // domClass.remove(animateBtn, "icon-ui-play");
+        // domClass.add(animateBtn, "icon-ui-pause");
+        _animating = true;
+        requestAnimationFrame(_updateAlongLocation);
+      };
+
+      const stopAnimation = () => {
+        // domClass.add(animateBtn, "icon-ui-play");
+        // domClass.remove(animateBtn, "icon-ui-pause");
+        _animating = false;
+      };
+
+      /*const animateBtn = dom.byId("animate-btn");
+      on(animateBtn, "click", () => {
+        if(_animating){
+          stopAnimation();
+        } else {
+          startAnimation();
+        }
+      });*/
+
       this.on("route-cleared", () => {
         alongLocation = null;
         distanceFeature.geometry = null;
@@ -503,28 +589,20 @@ define([
 
       this.on("route-solved", routeResult => {
 
-        const routePolyline = routeResult.geometry.clone();
-        const totalTimeMinutes = routeResult.attributes.Total_TravelTime;
+        _routePolyline = routeResult.geometry.clone();
+        _totalTimeMinutes = routeResult.attributes.Total_TravelTime;
+        _start = null;
 
-        let _animating = true;
-        let start = null;
+        const searchArea = geometryEngine.geodesicBuffer(_routePolyline, distanceSlider.values[0], "feet");
+        this.losSetTargets(searchArea).then(() => {
 
-        const updateAlongLocation = (ts) => {
-          if(!start) start = ts;
-          const progress = (ts - start);
+          setTimeout(() => {
+            startAnimation();
+          }, 1000);
 
-          const alongTimeMinutes = (progress / simulationPlaybackRate);
-          if(_animating && (alongTimeMinutes <= totalTimeMinutes)){
+        });
 
-            alongLocation = this.findLocationAlong(routePolyline, alongTimeMinutes);
-
-            requestAnimationFrame(updateAnalysis);
-            requestAnimationFrame(updateAlongLocation);
-
-          }
-        };
-
-        requestAnimationFrame(updateAlongLocation);
+        //domClass.remove(animateBtn, "btn-disabled");
       });
 
     },
