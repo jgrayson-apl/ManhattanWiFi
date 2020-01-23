@@ -222,8 +222,38 @@ define([
       this.initializeElevationSampler(view);
 
       this.initializeWiFiLocations(view).then(() => {
-        this.initializeRoute(view);
-        this.initializeRouteTour(view);
+
+        this.initializeManhattanCounty(view).then(manhattanCountyArea => {
+
+          this.initializeRoute(view, manhattanCountyArea);
+
+          this.initializeRouteTour(view);
+
+          // this.addRandomStop();
+          // this.addRandomStop();
+        });
+      });
+
+    },
+
+    /**
+     *
+     * @param view
+     * @returns {Promise<Polygon>}
+     */
+    initializeManhattanCounty: function(view){
+
+      const countiesLayer = view.map.layers.find(layer => {
+        return (layer.title === "USA Counties");
+      });
+      return countiesLayer.load().then(() => {
+        return view.whenLayerView(countiesLayer).then(countiesLayerView => {
+          return watchUtils.whenNotOnce(countiesLayerView, "updating").then(() => {
+            return countiesLayerView.queryFeatures().then(countiesFS => {
+              return countiesFS.features[0].geometry;
+            });
+          });
+        });
       });
 
     },
@@ -249,8 +279,9 @@ define([
     /**
      *
      * @param view
+     * @param manhattanCountyArea
      */
-    initializeRoute: function(view){
+    initializeRoute: function(view, manhattanCountyArea){
 
       const routeTask = new RouteTask({
         url: "https://utility.arcgis.com/usrsvcs/appservices/KT1q6dPgISfGSXFb/rest/services/World/Route/NAServer/Route_World"
@@ -349,6 +380,29 @@ define([
 
       };
 
+
+      const getRandomLocation = (searchArea) => {
+
+        const extent = searchArea.extent;
+        let locationInSearchArea = null;
+
+        do {
+          locationInSearchArea = new Point({
+            spatialReference: view.spatialReference,
+            x: (extent.xmin + (Math.random() * (extent.xmax - extent.xmin))),
+            y: (extent.ymin + (Math.random() * (extent.ymax - extent.ymin)))
+          });
+        } while(!searchArea.contains(locationInSearchArea));
+
+        return locationInSearchArea;
+      };
+
+      this.addRandomStop = () => {
+        const searchArea = geometryEngine.clip(manhattanCountyArea, view.extent);
+        addStop({ mapPoint: getRandomLocation(searchArea) });
+      };
+
+
       view.container.style.cursor = "crosshair";
       view.on("click", addStop);
 
@@ -378,7 +432,6 @@ define([
         return wifiNode;
       };
 
-
       const wifiLayer = view.map.layers.find(layer => {
         return (layer.title === "WiFi Locations");
       });
@@ -396,14 +449,13 @@ define([
           });
         });
 
-        // const legend = new Legend({view:view,layerInfos:[{layer:wifiLayer}]});
-        // view.ui.add(legend,"top-right");
-
+        //const legend = new Legend({view:view,layerInfos:[{layer:wifiLayer}]});
+        //view.ui.add(legend,"top-right");
 
         return view.whenLayerView(wifiLayer).then(wifiLayerView => {
           return watchUtils.whenNotOnce(wifiLayerView, "updating", () => {
 
-            let wifiLocationTargetInfos = { targets: [], features: [] };
+            let wifiLocationTargetInfos = { features: [], targets: [], nodes: [], selected: [] };
 
             //
             // LINE-OF-SIGHT //
@@ -581,6 +633,7 @@ define([
           alongLocation = null;
           distanceFeature.geometry = null;
           locationFeature.geometry = null;
+          //this.addRandomStop();
         }
       };
 
