@@ -302,7 +302,7 @@ define([
             profile: "quad",
             profileRotation: "heading",
             castShadows: true,
-            width: 10, height: 0.5,
+            width: 15, height: 1.0,
             material: { color: "#eadb69" }
           }]
         }
@@ -339,7 +339,11 @@ define([
         const routeResult = data.routeResults[0].route;
         routeFeature.geometry = routeResult.geometry;
 
-        view.goTo({ target: routeFeature.geometry, scale: 7500, tilt: 45.0 }).then(() => {
+        const first = routeFeature.geometry.getPoint(0, 0);
+        const last = routeFeature.geometry.getPoint(0, routeFeature.geometry.paths[0].length - 1);
+        const pathHeading = this.getHeading(first, last) - 90.0;  // PERPENDICULAR TO PATH //
+
+        view.goTo({ target: routeFeature.geometry, scale: 8000, tilt: 35.0, heading: pathHeading }).then(() => {
           this.emit("route-solved", routeResult);
         });
 
@@ -412,11 +416,9 @@ define([
             };
 
             losViewModel.targets.on("change", changeEvt => {
-
               let visibleIdx = [];
               changeEvt.added.forEach((target, targetIdx) => {
                 target.watch("visible", visible => {
-
                   if(losObserverWGS84 != null){
                     if(visible && !visibleIdx.includes(targetIdx)){
 
@@ -440,8 +442,9 @@ define([
 
                         highlight && highlight.remove();
                         highlight = wifiLayerView.highlight(wifiLocationTargetInfos.selected);
+                      } else {
+                        target.visible = false;
                       }
-
                     }
                   }
                 })
@@ -538,8 +541,7 @@ define([
 
       this.analysisSearchDistanceMeters = 100;
 
-      const playbackRate_realTime = 1.0;
-      const playbackRate_simulation = 4.0;
+      const playbackRate = 8.0;
 
       let alongLocation = null;
       const updateAnalysis = () => {
@@ -564,7 +566,7 @@ define([
             alongLocation = this.findLocationAlong(_routePolyline, _alongTimeMinutes);
             updateAnalysis();
 
-            _alongTimeMinutes += (60 / (1000 * playbackRate_simulation));
+            _alongTimeMinutes += (60 / (1000 * playbackRate));
 
             requestAnimationFrame(_updateAlongLocation);
 

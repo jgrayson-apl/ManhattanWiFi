@@ -89,7 +89,7 @@ body * {
 }
 
 .wifi-node.visible {
-  color             : limegreen;
+  color             : forestgreen;
   background-color  : rgba(50, 205, 50, 0.05);
   border-left-color : limegreen;
 }
