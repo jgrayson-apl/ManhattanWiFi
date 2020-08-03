@@ -22,25 +22,9 @@
     <div class="js-modal modal-overlay" data-modal="app-details-dialog">
       <div class="modal-content column-14" aria-labelledby="modal" role="dialog">
         <span class="js-modal-toggle esri-interactive icon-ui-close right" aria-label="close-modal"></span>
-        <h3 class="trailer-half text-blue">Configurable Application</h3>
+        <h3 class="trailer-half text-blue">Manhattan WiFi Accessibility</h3>
         <div class="panel">
-          This application loads a web map or web scene and provides simple mapping capabilities via the ArcGIS API for JavaScript 4.x.
-        </div>
-        <div class="margin-left-2 leader-quarter">
-          This application is built using:
-          <ul>
-            <li>
-              <a href="https://developers.arcgis.com/javascript/" target="_blank">Esri ArcGIS API for Javascript 4.x</a>
-            </li>
-            <li>
-              <a href="https://github.com/Esri/application-base-js" target="_blank">Esri ApplicationBase</a>
-              <span>&nbsp;&&nbsp;</span>
-              <a href="https://github.com/Esri/configurable-app-examples-4x-js" target="_blank">Configurable App Example</a>
-            </li>
-            <li>
-              <a href="http://esri.github.io/calcite-web/" target="_blank">Esri Calcite Web Framework</a>
-            </li>
-          </ul>
+          Find accessible WiFi locations along a route in Manhattan. The analysis considers a WiFi location accessible if it's visible from within a maximum range of 100 meters.
         </div>
         <div class="leader-half">
           <img src="./assets/esri_science_of_where.png" class="left">
@@ -52,7 +36,7 @@
     </div>
 
     <!-- TOP NAVIGATION -->
-    <header id="header-panel" class="panel panel-no-padding panel-no-border padding-left-1 padding-right-1">
+    <header id="header-panel" class="panel panel-yellow panel-no-padding panel-no-border padding-left-1 padding-right-1">
       <!-- APP TITLE -->
       <span id="app-title-node" class="top-nav-title avenir-demi"></span>
 
@@ -89,18 +73,67 @@
       <!-- LEFT CONTAINER -->
       <div id="left-container" class="panel panel-dark panel-no-border column-6">
 
-        <div id="info-panel" class="panel panel-black trailer-half">
+        <div id="info-panel" class="panel panel-black trailer-half font-size--1">
           Find accessible WiFi locations along a route in Manhattan. The analysis considers a WiFi location accessible if it's visible from within a maximum range of 100 meters.
         </div>
 
-        <div id="animate-panel" class="panel text-off-black trailer-half">
-          <div id="animate-btn" class="font-size-7 icon-ui-play text-center esri-interactive btn-disabled"></div>
+        <div id="animate-panel" class="panel panel-yellow panel-no-border  trailer-half">
+
+          <label class="avenir-demi trailer-quarter">Analysis Options</label>
+
+          <!--<fieldset class="radio-group trailer-half">
+            <legend class="radio-group-title avenir-demi">Analysis Options</legend>
+            <span class="text-center">
+              <input class="radio-group-input" type="radio" id="los-interactive-input" name="los-option" checked/>
+              <label class="radio-group-label" for="los-interactive-input">Interactive Line-of-Sight</label>
+              <input class="radio-group-input" type="radio" id="los-route-input" name="los-option"/>
+              <label class="radio-group-label" for="los-route-input">Along a Route</label>
+            </span>
+          </fieldset>-->
+
+          <!--<div class="panel trailer-half">
+            Interactive Line-of-Sight
+            <div id="los-button"></div>
+          </div>-->
+
+          <label class="trailer-0 clearfix">
+            <span class="font-size--1">Travel Mode</span>
+            <label class="toggle-switch trailer-quarter right">
+              <span id="travel-mode-walk-label" class="toggle-switch-label tooltip tooltip-bottom tooltip-multiline font-size--1" aria-label="Walking Time">walk</span>
+              <input id="travel-mode-switch" type="checkbox" class="toggle-switch-input" checked>
+              <span class="toggle-switch-track"></span>
+              <span id="travel-mode-drive-label" class="toggle-switch-label tooltip tooltip-bottom tooltip-multiline font-size--1" aria-label="Drive Time">drive</span>
+            </label>
+          </label>
+
+          <label class="trailer-0 clearfix">
+            <span class="font-size--1">Playback Rate</span>
+            <label class="toggle-switch right">
+              <span class="toggle-switch-label font-size--1">normal</span>
+              <input id="playback-switch" type="checkbox" class="toggle-switch-input" checked>
+              <span class="toggle-switch-track"></span>
+              <span class="toggle-switch-label font-size--1">faster</span>
+            </label>
+          </label>
+          
+          <div class="panel panel-black">
+            <div class="text-center">
+              <span id="animate-btn" title="Play / Pause" class="font-size-6 icon-ui-play esri-interactive btn-disabled"></span>
+            </div>
+            <div id="route-info-node" class="text-center font-size--3 avenir-italic">
+              <span id="route-along-label">00:00</span>
+              <span>of</span>
+              <span id="route-total-label">00:00</span>
+              <!--<span>minutes</span>-->
+            </div>
+          </div>
+
         </div>
 
         <aside id="wifi-container" class="side-nav text-off-black" aria-role="complementary">
           <div class="side-nav-title">
-            <span>WiFi Locations</span>
-            <mark class="label label-yellow avenir-demi right">
+            <span class="avenir-demi">WiFi Locations</span>
+            <mark class="label label-dark right">
               <span id="wifi-selected-count">0</span>
               <span>of</span>
               <span id="wifi-count">0</span>

@@ -31,6 +31,7 @@ define([
   "dojo/dom-class",
   "dojo/dom-construct",
   "esri/identity/IdentityManager",
+  "esri/request",
   "esri/core/Evented",
   "esri/core/watchUtils",
   "esri/core/promiseUtils",
@@ -47,16 +48,17 @@ define([
   "esri/tasks/RouteTask",
   "esri/tasks/support/RouteParameters",
   "esri/tasks/support/FeatureSet",
+  "esri/widgets/LineOfSight",
   "esri/widgets/LineOfSight/LineOfSightViewModel",
   "esri/widgets/Legend",
   "esri/widgets/Slider",
   "esri/widgets/Expand"
 ], function(calcite, declare, ApplicationBase, i18n, itemUtils, domHelper,
             Color, colors, number, locale, on, query, dom, domClass, domConstruct,
-            IdentityManager, Evented, watchUtils, promiseUtils, Portal,
+            IdentityManager, esriRequest, Evented, watchUtils, promiseUtils, Portal,
             Layer, GraphicsLayer, Point, Extent, geometryEngine, geodesicUtils,
             Graphic, symbolUtils, Home, RouteTask, RouteParameters, FeatureSet,
-            LineOfSightViewModel, Legend, Slider, Expand){
+            LineOfSight, LineOfSightViewModel, Legend, Slider, Expand){
 
   return declare([Evented], {
 
@@ -223,15 +225,44 @@ define([
 
       this.initializeWiFiLocations(view).then(() => {
 
+        //this.initializeInteractiveLOS(view);
+
         this.initializeManhattanCounty(view).then(manhattanCountyArea => {
 
           this.initializeRoute(view, manhattanCountyArea);
 
           this.initializeRouteTour(view);
 
-          // this.addRandomStop();
-          // this.addRandomStop();
+          if(this.base.config.kiosk){
+            watchUtils.whenNotOnce(view, "updating", () => {
+              this.addRandomStop();
+              this.addRandomStop();
+            });
+          }
         });
+      });
+
+    },
+
+    /**
+     *
+     * @param view
+     */
+    initializeInteractiveLOS: function(view){
+
+      const losWidget = new LineOfSight({
+        container: "los-button",
+        view: view
+      });
+      losWidget.viewModel.watch("state", state => {
+        if(state === "creating"){
+          this.emit("los-creating", { vm: losWidget.viewModel });
+        }
+      });
+      this.on("los-creating", evt => {
+        if(evt.vm !== losWidget.viewModel){
+          losWidget.viewModel.clear();
+        }
       });
 
     },
@@ -283,28 +314,48 @@ define([
      */
     initializeRoute: function(view, manhattanCountyArea){
 
-      const routeTask = new RouteTask({
-        url: "https://utility.arcgis.com/usrsvcs/appservices/KT1q6dPgISfGSXFb/rest/services/World/Route/NAServer/Route_World"
-      });
+      const verticalOffset = {
+        screenLength: 80,
+        maxWorldLength: 1500,
+        minWorldLength: 50
+      };
 
-      const routeParams = new RouteParameters({
-        stops: new FeatureSet(),
-        startTimeIsUTC: true,
-        startTime: Date.now(),
-        outputLines: "true-shape-with-measure",
-        outSpatialReference: { wkid: 3857 }
-      });
+      const callout = (color) => {
+        return {
+          type: "line",
+          size: 1.5,
+          color: Color.named.white,
+          border: {
+            color: color
+          }
+        };
+      };
+
+      const textSymbolLayer = (color, text) => {
+        return {
+          type: "text",
+          text: text,
+          material: { color: color },
+          halo: { color: Color.named.white, size: 2.0 },
+          size: 25
+        };
+      };
 
       const sizeSettings = { width: 15, height: 200, };
       const startFeature = new Graphic({
         symbol: {
           type: "point-3d",
-          symbolLayers: [{
-            type: "object",
-            ...sizeSettings,
-            resource: { primitive: "cylinder" },
-            material: { color: Color.named.lime }
-          }]
+          verticalOffset: verticalOffset,
+          callout: callout(Color.named.limegreen),
+          symbolLayers: [
+            textSymbolLayer(Color.named.limegreen, "start")
+            /*{
+              type: "object",
+              ...sizeSettings,
+              resource: { primitive: "cylinder" },
+              material: { color: Color.named.lime }
+            }*/
+          ]
         },
         attributes: {
           name: "Start Location"
@@ -313,12 +364,17 @@ define([
       const endFeature = new Graphic({
         symbol: {
           type: "point-3d",
-          symbolLayers: [{
-            type: "object",
-            ...sizeSettings,
-            resource: { primitive: "cylinder" },
-            material: { color: Color.named.red }
-          }]
+          verticalOffset: verticalOffset,
+          callout: callout(Color.named.darkred),
+          symbolLayers: [
+            textSymbolLayer(Color.named.darkred, "end")
+            /*{
+              type: "object",
+              ...sizeSettings,
+              resource: { primitive: "cylinder" },
+              material: { color: Color.named.red }
+            }*/
+          ]
         },
         attributes: {
           name: "End Location"
@@ -327,84 +383,157 @@ define([
       const routeFeature = new Graphic({
         symbol: {
           type: "line-3d",
-          symbolLayers: [{
-            type: "path",
-            cap: "square",
-            profile: "quad",
-            profileRotation: "heading",
-            castShadows: true,
-            width: 15, height: 1.0,
-            material: { color: "#eadb69" }
-          }]
+          symbolLayers: [
+            {
+              type: "line",
+              size: 5,
+              material: { color: "#eadb69" },
+              cap: "round",
+              join: "round"
+            }/*,
+                {
+                  type: "path",
+                  cap: "square",
+                  profile: "quad",
+                  profileRotation: "heading",
+                  castShadows: true,
+                  width: 15, height: 1.0,
+                  material: { color: "#eadb69" }
+                }*/
+          ]
         }
       });
 
-      const routeLayer = new GraphicsLayer({ graphics: [startFeature, endFeature, routeFeature] }); // ,routeFeature
+      const routeLayer = new GraphicsLayer({ graphics: [startFeature, endFeature, routeFeature] });
       view.map.add(routeLayer);
 
-      const addStop = (evt) => {
-        switch(routeParams.stops.features.length){
-          case 0:
-            this.emit("route-cleared", {});
-            routeFeature.geometry = null;
-            endFeature.geometry = null;
-            startFeature.geometry = evt.mapPoint;
-            routeParams.stops.features.push(startFeature);
-            break;
-          case 1:
-            endFeature.geometry = evt.mapPoint;
-            routeParams.stops.features.push(endFeature);
-            routeParams.startTime = Date.now();
-            routeTask.solve(routeParams).then(showRoute);
-            break;
-          case 2:
-            this.emit("route-cleared", {});
-            startFeature.geometry = endFeature.geometry;
-            endFeature.geometry = evt.mapPoint;
-            routeParams.startTime = Date.now();
-            routeTask.solve(routeParams).then(showRoute);
-        }
-      };
 
-      const showRoute = (data) => {
-        const routeResult = data.routeResults[0].route;
-        routeFeature.geometry = routeResult.geometry;
+      //const travelModeSelect = dom.byId("travel-mode-select");
+      //const travelModeLabel = dom.byId("travel-mode-label");
+      const travelModeInput = dom.byId("travel-mode-switch");
+      const travelModeDriveLabel = dom.byId("travel-mode-drive-label");
+      const travelModeWalkLabel = dom.byId("travel-mode-walk-label");
 
-        const first = routeFeature.geometry.getPoint(0, 0);
-        const last = routeFeature.geometry.getPoint(0, routeFeature.geometry.paths[0].length - 1);
-        const pathHeading = this.getHeading(first, last) - 90.0;  // PERPENDICULAR TO PATH //
+      const routeTask = new RouteTask({
+        url: "https://utility.arcgis.com/usrsvcs/appservices/KT1q6dPgISfGSXFb/rest/services/World/Route/NAServer/Route_World"
+      });
+      esriRequest(`${routeTask.url}/retrieveTravelModes`, { query: { f: "json" } }).then(getTravelModesResponse => {
 
-        view.goTo({ target: routeFeature.geometry, scale: 8000, tilt: 35.0, heading: pathHeading }).then(() => {
-          this.emit("route-solved", routeResult);
+        const travelModesInfos = getTravelModesResponse.data.supportedTravelModes;
+
+        travelModesInfos.forEach(travelModeInfo => {
+          /*const groupId = `travel-mode-option-${travelModeInfo.type}`;
+          let group = dom.byId(groupId);
+          if(!group){
+            group = domConstruct.create("optgroup", { id: groupId, label: travelModeInfo.type }, travelModeSelect);
+          }
+          domConstruct.create("option", { value: travelModeInfo.name, innerHTML: travelModeInfo.name, }, group);*/
+          if(travelModeInfo.name === "Driving Time"){
+            travelModeDriveLabel.setAttribute("aria-label", travelModeInfo.description);
+          }
+          if(travelModeInfo.name === "Walking Time"){
+            travelModeWalkLabel.setAttribute("aria-label", travelModeInfo.description);
+          }
         });
 
-      };
-
-
-      const getRandomLocation = (searchArea) => {
-
-        const extent = searchArea.extent;
-        let locationInSearchArea = null;
-
-        do {
-          locationInSearchArea = new Point({
-            spatialReference: view.spatialReference,
-            x: (extent.xmin + (Math.random() * (extent.xmax - extent.xmin))),
-            y: (extent.ymin + (Math.random() * (extent.ymax - extent.ymin)))
+        const getTravelMode = () => {
+          const travelMode = (travelModeInput.checked) ? "Driving Time" : "Walking Time";
+          return travelModesInfos.find(travelModeInfo => {
+            return (travelModeInfo.name === travelMode);
           });
-        } while(!searchArea.contains(locationInSearchArea));
+        };
 
-        return locationInSearchArea;
-      };
+        /*
+        travelModeLabel.setAttribute("aria-label", getTravelMode().description);
+        on(travelModeSelect, "change", () => {
+          travelModeLabel.setAttribute("aria-label", getTravelMode().description);
+        });
+        domClass.remove(travelModeSelect, "btn-disabled");
+        */
 
-      this.addRandomStop = () => {
-        const searchArea = geometryEngine.clip(manhattanCountyArea, view.extent);
-        addStop({ mapPoint: getRandomLocation(searchArea) });
-      };
+
+        const routeParams = new RouteParameters({
+          stops: new FeatureSet(),
+          startTimeIsUTC: true,
+          preserveFirstStop: true,
+          preserveLastStop: true,
+          returnStops: true,
+          returnDirections: false,
+          outputLines: "true-shape-with-measure",
+          outSpatialReference: { wkid: 3857 }
+        });
+
+        const addStop = (evt) => {
+          switch(routeParams.stops.features.length){
+            case 0:
+              this.emit("route-cleared", {});
+              routeFeature.geometry = null;
+              endFeature.geometry = null;
+              startFeature.geometry = evt.mapPoint;
+              routeParams.stops.features.push(startFeature);
+              break;
+            case 1:
+              endFeature.geometry = evt.mapPoint;
+              routeParams.stops.features.push(endFeature);
+              routeParams.startTime = Date.now();
+              routeParams.travelMode = getTravelMode();
+              routeTask.solve(routeParams).then(showRoute);
+              break;
+            case 2:
+              this.emit("route-cleared", {});
+              startFeature.geometry = endFeature.geometry;
+              endFeature.geometry = evt.mapPoint;
+              routeParams.startTime = Date.now();
+              routeParams.travelMode = getTravelMode();
+              routeTask.solve(routeParams).then(showRoute);
+          }
+        };
 
 
-      view.container.style.cursor = "crosshair";
-      view.on("click", addStop);
+        const showRoute = (data) => {
+          const routeResult = data.routeResults[0].route;
+          routeFeature.geometry = routeResult.geometry;
+
+          const first = routeFeature.geometry.getPoint(0, 0);
+          const last = routeFeature.geometry.getPoint(0, routeFeature.geometry.paths[0].length - 1);
+          const pathHeading = this.getHeading(first, last) - 90.0;  // PERPENDICULAR TO PATH //
+
+          view.goTo({ target: routeFeature.geometry, scale: 8500, tilt: 55.0, heading: pathHeading }).then(() => {
+            this.emit("route-solved", routeResult);
+          });
+
+        };
+
+        const getRandomLocation = (searchArea) => {
+
+          const extent = searchArea.extent;
+          let locationInSearchArea = null;
+
+          do {
+            locationInSearchArea = new Point({
+              spatialReference: view.spatialReference,
+              x: (extent.xmin + (Math.random() * (extent.xmax - extent.xmin))),
+              y: (extent.ymin + (Math.random() * (extent.ymax - extent.ymin)))
+            });
+          } while(!searchArea.contains(locationInSearchArea));
+
+          return locationInSearchArea;
+        };
+
+        this.addRandomStop = () => {
+          const searchArea = geometryEngine.clip(manhattanCountyArea, view.extent);
+          addStop({ mapPoint: getRandomLocation(searchArea) });
+        };
+
+        view.container.style.cursor = "wait";
+        watchUtils.whenTrueOnce(view, "updating", () => {
+          watchUtils.whenFalseOnce(view, "updating", () => {
+            view.container.style.cursor = "crosshair";
+            view.on("click", addStop);
+          });
+        });
+
+      });
 
     },
 
@@ -432,8 +561,9 @@ define([
         return wifiNode;
       };
 
+      const losTargetsLayerTitles = ["WiFi Locations", "private transmission towers"]; //"VBCPS School Facilities",
       const wifiLayer = view.map.layers.find(layer => {
-        return (layer.title === "WiFi Locations");
+        return (losTargetsLayerTitles.includes(layer.title));
       });
       return wifiLayer.load().then(() => {
         wifiLayer.outFields = ["*"];
@@ -449,8 +579,8 @@ define([
           });
         });
 
-        //const legend = new Legend({view:view,layerInfos:[{layer:wifiLayer}]});
-        //view.ui.add(legend,"top-right");
+        // const legend = new Legend({view:view,layerInfos:[{layer:wifiLayer}]});
+        // view.ui.add(legend,"top-right");
 
         return view.whenLayerView(wifiLayer).then(wifiLayerView => {
           return watchUtils.whenNotOnce(wifiLayerView, "updating", () => {
@@ -461,6 +591,17 @@ define([
             // LINE-OF-SIGHT //
             //
             const losViewModel = new LineOfSightViewModel({ view: view });
+            /*losViewModel.watch("state", state => {
+              if(state === "creating"){
+                this.emit("los-creating", { vm: losViewModel });
+              }
+            });
+            this.on("los-creating", evt => {
+              if(evt.vm !== losViewModel){
+                losViewModel.clear();
+              }
+            });*/
+
             let losObserverWGS84 = null;
 
             this.losClear = () => {
@@ -540,6 +681,7 @@ define([
             });
 
             this.updateLOSAnalysis = (location, searchArea) => {
+
               losViewModel.observer = location;
               losViewModel.stop();
 
@@ -548,6 +690,8 @@ define([
                 longitude: location.longitude,
                 latitude: location.latitude,
               });
+
+              //view.goTo({ target: location, position: view.camera.position });
 
             };
 
@@ -593,7 +737,11 @@ define([
 
       this.analysisSearchDistanceMeters = 100;
 
-      const playbackRate = 8.0;
+      const playbackSwitch = dom.byId("playback-switch");
+      const getPlaybackRate = () => {
+        // 1 faster than 10...  is 60 realtime? //
+        return playbackSwitch.checked ? 10.0 : 200.0;
+      };
 
       let alongLocation = null;
       const updateAnalysis = () => {
@@ -604,6 +752,13 @@ define([
         }
       };
 
+      const routeAlongLabel = dom.byId("route-along-label");
+      this.getDuration = (alongMinutes) => {
+        const minutes = Math.floor(alongMinutes);
+        const seconds = Math.floor((alongMinutes - minutes) * 60);
+        return (minutes > 0) ? `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` : `00:${String(seconds).padStart(2, "0")}`;
+      };
+
       let _animating = false;
       let _routePolyline = null;
       let _totalTimeMinutes = null;
@@ -612,14 +767,15 @@ define([
       const _updateAlongLocation = () => {
         if(!_alongTimeMinutes) _alongTimeMinutes = 0.0;
 
+        routeAlongLabel.innerHTML = this.getDuration(_alongTimeMinutes);
+
         if(_alongTimeMinutes <= _totalTimeMinutes){
           if(_animating){
 
             alongLocation = this.findLocationAlong(_routePolyline, _alongTimeMinutes);
-            updateAnalysis();
+            requestAnimationFrame(updateAnalysis);
 
-            _alongTimeMinutes += (60 / (1000 * playbackRate));
-
+            _alongTimeMinutes += (60 / (1000 * getPlaybackRate()));
             requestAnimationFrame(_updateAlongLocation);
 
           } else {
@@ -633,7 +789,13 @@ define([
           alongLocation = null;
           distanceFeature.geometry = null;
           locationFeature.geometry = null;
-          //this.addRandomStop();
+
+          if(this.base.config.kiosk){
+            setTimeout(() => {
+              this.addRandomStop();
+            }, 3000);
+          }
+
         }
       };
 
@@ -665,11 +827,15 @@ define([
         locationFeature.geometry = null;
       });
 
+      const routeTotalLabel = dom.byId("route-total-label");
+
       this.on("route-solved", routeResult => {
 
         _routePolyline = routeResult.geometry.clone();
-        _totalTimeMinutes = routeResult.attributes.Total_TravelTime;
+        _totalTimeMinutes = routeResult.attributes.Total_TravelTime || routeResult.attributes.Total_WalkTime;
         _alongTimeMinutes = 0.0;
+
+        routeTotalLabel.innerHTML = this.getDuration(_totalTimeMinutes);
 
         const searchArea = geometryEngine.geodesicBuffer(_routePolyline, this.analysisSearchDistanceMeters, "meters");
         this.losSetTargets(searchArea).then(() => {

@@ -20,14 +20,19 @@ body * {
   outline : none;
 }
 
-#header-panel {
-  flex-shrink      : 0;
-  flex-grow        : 0;
-  min-width        : 0;
-  min-height       : 0;
-  z-index          : 99;
-  box-shadow       : 0 1px 2px rgba(0, 0, 0, 0.3);
+.panel-yellow {
+  color            : #333333;
   background-color : #eadb69;
+  border-color     : darkgoldenrod;
+}
+
+#header-panel {
+  flex-shrink : 0;
+  flex-grow   : 0;
+  min-width   : 0;
+  min-height  : 0;
+  z-index     : 99;
+  box-shadow  : 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 #main-container {
@@ -56,20 +61,33 @@ body * {
 }
 
 #wifi-container {
-  flex           : 1 1 0;
-  min-width      : 0;
-  min-height     : 0;
-  display        : flex;
-  flex-direction : column;
+  flex             : 1 1 0;
+  min-width        : 0;
+  min-height       : 0;
+  display          : flex;
+  flex-direction   : column;
+  background-color : #323232;
+  border           : #222222;
+}
+
+.side-nav-title {
+  border-top-color : transparent;
+  background-color : #eadb69;
+}
+
+.label-dark {
+  color            : #ffffff;
+  background-color : #323232;
 }
 
 #wifi-list {
-  flex           : 1 1 0;
-  min-width      : 0;
-  min-height     : 0;
-  display        : flex;
-  flex-direction : column;
-  overflow-y     : auto;
+  flex             : 1 1 0;
+  min-width        : 0;
+  min-height       : 0;
+  display          : flex;
+  flex-direction   : column;
+  overflow-y       : auto;
+  background-color : #323232;
 }
 
 #wifi-list:empty {
@@ -85,11 +103,23 @@ body * {
 }
 
 .wifi-node {
-  border-left : solid 6px #f8f8f8;
+  color            : #ededed;
+  background-color : #323232;
+  border-left      : solid 6px transparent;
+  border-top-color : #222222 !important;
+}
+
+.wifi-node:last-of-type {
+  border-bottom : solid 1px #222222 !important;
+}
+
+.wifi-node:hover {
+  color            : #ededed;
+  background-color : #444444;
 }
 
 .wifi-node.visible {
-  color             : forestgreen;
+  color             : limegreen;
   background-color  : rgba(50, 205, 50, 0.05);
   border-left-color : limegreen;
 }
@@ -136,7 +166,23 @@ body * {
   background-color : rgba(234, 219, 105, 0.9) !important;
 }
 
-.side-nav-link:last-of-type {
-  border-bottom : solid 1px #efefef;
+.toggle-switch-input[type]:checked + .toggle-switch-track {
+  border-color     : #323232;
+  background-color : #4c4c4c;
+}
+
+.toggle-switch-input[type]:checked + .toggle-switch-track:after {
+  border-color : #323232;
+  box-shadow   : 0 2px 1px 0 rgba(89, 89, 89, 0.2);
+}
+
+.radio-group-input + .radio-group-label {
+  color : #999999;
+}
+
+.radio-group-input:checked + .radio-group-label {
+  color            : #efefef;
+  border           : 1px solid #000000;
+  background-color : #4c4c4c;
 }
 

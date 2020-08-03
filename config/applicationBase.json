@@ -21,6 +21,7 @@
     "fetch": true
   },
   "urlParams": [
+    "kiosk",
     "appid",
     "basemapUrl",
     "basemapReferenceUrl",
