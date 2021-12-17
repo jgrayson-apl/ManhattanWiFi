@@ -5,8 +5,8 @@
   "webmap": "",
   "webscene": "5ab08e64bbe44c6cbed43eff382f1452",
   "portalUrl": "https://www.arcgis.com",
-  "oauthappid": "kCCF9lHD2DdhhbUB",
-  "proxyUrl": "https://apl.esri.com/proxy/DotNet/proxy.ashx",
+  "oauthappid": "zs2uE3JGDA5vrISI",
+  "proxyUrl": null,
   "units": "dual",
   "helperServices": {
     "geometry": {
